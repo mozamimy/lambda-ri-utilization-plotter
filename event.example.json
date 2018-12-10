@@ -1,0 +1,8 @@
+{
+  "region": "us-east-1",
+  "service": "Amazon ElastiCache",
+  "linked_account": "1234567890",
+  "granularity": "DAILY",
+  "namespace": "RIUtilization",
+  "metric_name": "UtilizationPercentage"
+}

@@ -1,0 +1,15 @@
+version: '3'
+services:
+  builder:
+    build:
+      context: '.'
+    image: 'aws-lambda-rust'
+    volumes:
+      - 'builder-target:/tmp/target'
+      - 'builder-cargo-registry:/opt/cargo/registry'
+      - './:/workspace'
+volumes:
+  builder-target:
+    driver: 'local'
+  builder-cargo-registry:
+    driver: 'local'
