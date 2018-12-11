@@ -4,9 +4,9 @@
    "Resources": {
       "RIUtilizationPlotter": {
          "Properties": {
-            "CodeUri": "./package/lambda-ri-utilization-plotter.zip",
+            "CodeUri": "./package/ri-utilization-plotter.zip",
             "FunctionName": "ri-utilization-plotter",
-            "Handler": "lambda-ri-utilization-plotter",
+            "Handler": "ri-utilization-plotter",
             "MemorySize": 128,
             "Role": "WRITE YOUR LAMBDA EXECUTION ROLE",
             "Runtime": "provided",

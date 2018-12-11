@@ -1,4 +1,4 @@
-# lambda-ri-utilization-plotter
+# ri-utilization-plotter
 
 This AWS Lambda fucntion puts datapoinsts fetched by Cost Explorer API to CloudWatch custom metrics.
 

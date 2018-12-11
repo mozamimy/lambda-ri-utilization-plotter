@@ -1,5 +1,5 @@
 BUILD := debug
-APP_NAME := lambda-ri-utilization-plotter
+APP_NAME := ri-utilization-plotter
 JOBS := 4
 LOGICAL_FUNCTION_NAME := RIUtilizationPlotter
 
