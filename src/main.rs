@@ -79,17 +79,23 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
     let percentage: String;
     match cost_explorer.get_reservation_utilization(ce_request).sync() {
         Ok(r) => {
-            percentage = r
-                .utilizations_by_time
-                .last()
-                .unwrap()
-                .total
-                .as_ref()
-                .unwrap()
-                .utilization_percentage
-                .as_ref()
-                .unwrap()
-                .to_string();
+            if r.utilizations_by_time.last().is_some() {
+                percentage = r
+                    .utilizations_by_time
+                    .last()
+                    .unwrap()
+                    .total
+                    .as_ref()
+                    .unwrap()
+                    .utilization_percentage
+                    .as_ref()
+                    .unwrap()
+                    .to_string();
+            } else {
+                let message = "There are no utilization".to_string();
+                info!("{}", message);
+                return Ok(message);
+            }
         }
         Err(e) => return Err(ctx.new_error(&format!("{:?}", e))),
     }
