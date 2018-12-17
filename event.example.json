@@ -4,5 +4,6 @@
   "linked_account": "1234567890",
   "granularity": "DAILY",
   "namespace": "RIUtilization",
-  "metric_name": "UtilizationPercentage"
+  "metric_name": "UtilizationPercentage",
+  "ce_metric_type": "utilization"
 }
