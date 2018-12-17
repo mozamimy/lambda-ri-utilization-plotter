@@ -21,6 +21,7 @@ struct Event {
     service: Option<String>,
     linked_account: Option<String>,
     granularity: Option<String>,
+    ce_metric_type: Option<String>,
     namespace: String,
     metric_name: String,
 }
@@ -52,20 +53,17 @@ fn push_dimension(event_element: &Option<String>, dimensions: &mut Vec<rusoto_cl
     }
 }
 
-fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::HandlerError> {
+fn fetch_utilization_percentage(
+    filter: &rusoto_ce::Expression,
+    event: &Event,
+    ctx: &lambda::Context,
+) -> Result<Option<f64>, lambda::error::HandlerError> {
     // CostExplorer API is available in only us-east-1 (https://ce.us-east-1.amazonaws.com/)
     let cost_explorer = rusoto_ce::CostExplorerClient::new(rusoto_core::Region::UsEast1);
-    let mut filter = rusoto_ce::Expression {
-        and: Some(vec![]),
-        ..Default::default()
-    };
-    push_filter(&event.region, filter.and.as_mut().unwrap(), "REGION".to_string());
-    push_filter(&event.service, filter.and.as_mut().unwrap(), "SERVICE".to_string());
-    push_filter(&event.linked_account, filter.and.as_mut().unwrap(), "LINKED_ACCOUNT".to_string());
     let today: chrono::Date<chrono::Utc> = chrono::Utc::today();
     let ce_request = rusoto_ce::GetReservationUtilizationRequest {
-        filter: Some(filter),
-        granularity: event.granularity,
+        filter: Some(filter.clone()),
+        granularity: event.granularity.clone(),
         time_period: rusoto_ce::DateInterval {
             start: (today - chrono::Duration::days(7)).format("%Y-%m-%d").to_string(),
             end: today.format("%Y-%m-%d").to_string(),
@@ -76,11 +74,10 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
     info!("Make a request for Cost Explorer");
     info!("{:?}", ce_request);
 
-    let percentage: String;
     match cost_explorer.get_reservation_utilization(ce_request).sync() {
         Ok(r) => {
             if r.utilizations_by_time.last().is_some() {
-                percentage = r
+                let percentage = r
                     .utilizations_by_time
                     .last()
                     .unwrap()
@@ -90,14 +87,88 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
                     .utilization_percentage
                     .as_ref()
                     .unwrap()
-                    .to_string();
+                    .parse()
+                    .unwrap();
+                Ok(Some(percentage))
             } else {
-                let message = "There are no utilization".to_string();
-                info!("{}", message);
-                return Ok(message);
+                Ok(None)
             }
         }
-        Err(e) => return Err(ctx.new_error(&format!("{:?}", e))),
+        Err(e) => Err(ctx.new_error(&format!("{:?}", e))),
+    }
+}
+
+fn fetch_coverage_percentage(
+    filter: &rusoto_ce::Expression,
+    event: &Event,
+    ctx: &lambda::Context,
+) -> Result<Option<f64>, lambda::error::HandlerError> {
+    // CostExplorer API is available in only us-east-1 (https://ce.us-east-1.amazonaws.com/)
+    let cost_explorer = rusoto_ce::CostExplorerClient::new(rusoto_core::Region::UsEast1);
+    let today: chrono::Date<chrono::Utc> = chrono::Utc::today();
+    let ce_request = rusoto_ce::GetReservationCoverageRequest {
+        filter: Some(filter.clone()),
+        granularity: event.granularity.clone(),
+        time_period: rusoto_ce::DateInterval {
+            start: (today - chrono::Duration::days(7)).format("%Y-%m-%d").to_string(),
+            end: today.format("%Y-%m-%d").to_string(),
+        },
+        ..Default::default()
+    };
+
+    info!("Make a request for Cost Explorer");
+    info!("{:?}", ce_request);
+
+    match cost_explorer.get_reservation_coverage(ce_request).sync() {
+        Ok(r) => {
+            if r.coverages_by_time.last().is_some() {
+                let percentage = r
+                    .coverages_by_time
+                    .last()
+                    .unwrap()
+                    .total
+                    .as_ref()
+                    .unwrap()
+                    .coverage_hours
+                    .as_ref()
+                    .unwrap()
+                    .coverage_hours_percentage
+                    .as_ref()
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                Ok(Some(percentage))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(e) => Err(ctx.new_error(&format!("{:?}", e))),
+    }
+}
+
+fn fetch_percentage(event: &Event, ctx: &lambda::Context) -> Result<Option<f64>, lambda::error::HandlerError> {
+    let mut filter = rusoto_ce::Expression {
+        and: Some(vec![]),
+        ..Default::default()
+    };
+    push_filter(&event.region, filter.and.as_mut().unwrap(), "REGION".to_string());
+    push_filter(&event.service, filter.and.as_mut().unwrap(), "SERVICE".to_string());
+    push_filter(&event.linked_account, filter.and.as_mut().unwrap(), "LINKED_ACCOUNT".to_string());
+    let ce_metric_utilization = "utilization".to_string();
+    let ce_metrice_type = event.ce_metric_type.as_ref().unwrap_or(&ce_metric_utilization).as_str();
+    match ce_metrice_type {
+        "utilization" => fetch_utilization_percentage(&filter, &event, ctx),
+        "coverage" => fetch_coverage_percentage(&filter, &event, ctx),
+        _ => return Err(ctx.new_error(&format!("Unsupported Cost Explorer metrics type: {}", ce_metrice_type))),
+    }
+}
+
+fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::HandlerError> {
+    let percentage = fetch_percentage(&event, &ctx)?;
+    if percentage.is_none() {
+        let message = "There are no metrics".to_string();
+        info!("{}", message);
+        return Ok(message);
     }
 
     let cloudwatch = rusoto_cloudwatch::CloudWatchClient::new(rusoto_core::Region::default());
@@ -107,7 +178,7 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
     push_dimension(&event.linked_account, &mut dimensions, "LinkedAccount".to_string());
     let metric_data = vec![rusoto_cloudwatch::MetricDatum {
         metric_name: event.metric_name,
-        value: Some(percentage.parse().unwrap()),
+        value: Some(percentage.unwrap()),
         dimensions: Some(dimensions),
         ..Default::default()
     }];
