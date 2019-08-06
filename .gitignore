@@ -1,4 +1,3 @@
 /target
 **/*.rs.bk
-/package/*.zip
-/package/bootstrap
+/tmp

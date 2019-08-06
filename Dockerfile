@@ -1,18 +1,14 @@
-FROM lambci/lambda:provided
+FROM lambci/lambda:build-provided
 
-USER root
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
 
-ENV RUSTUP_HOME=/opt/rustup \
-    CARGO_HOME=/opt/cargo \
-    CARGO_BUILD_TARGET_DIR=/tmp/target \
-    PATH=/opt/cargo/bin:$PATH
+ARG RUST_VERSION=1.36.0
 
-RUN yum -y update
-RUN rpm --rebuilddb && yum -y groupinstall "Development Tools" && yum -y install openssl-devel
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y
-RUN rustup component add rustfmt-preview
-
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUST_VERSION
+RUN rustup component add rustfmt
+RUN mkdir /workspace
 WORKDIR /workspace
 
-ENTRYPOINT []
+CMD ["rustup", "--version"]

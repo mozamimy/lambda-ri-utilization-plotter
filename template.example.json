@@ -4,7 +4,7 @@
    "Resources": {
       "RIUtilizationPlotter": {
          "Properties": {
-            "CodeUri": "./package/ri-utilization-plotter.zip",
+            "CodeUri": "./target/debug/bootstrap.zip",
             "FunctionName": "ri-utilization-plotter",
             "Handler": "ri-utilization-plotter",
             "MemorySize": 128,
@@ -12,10 +12,10 @@
             "Runtime": "provided",
             "Timeout": 30,
             "Environment": {
-              "Variables": {
-                "RUST_LOG": "info",
-                "RUST_BACKTRACE": "1"
-              }
+               "Variables": {
+                  "RUST_LOG": "info",
+                  "RUST_BACKTRACE": "1"
+               }
             }
          },
          "Type": "AWS::Serverless::Function"
