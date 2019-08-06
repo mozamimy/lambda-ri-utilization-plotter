@@ -1,6 +1,5 @@
 BUILD_IMAGE := ri-utilization-plotter-build
 APP_NAME := ri-utilization-plotter
-JOBS := 4
 LOGICAL_FUNCTION_NAME := RIUtilizationPlotter
 
 init:
