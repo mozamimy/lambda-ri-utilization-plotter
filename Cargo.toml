@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 env_logger = "0.6"
+failure = "0.1"
 lambda_runtime = "0.2"
 log = "0.4"
 rusoto_core = "0.40"

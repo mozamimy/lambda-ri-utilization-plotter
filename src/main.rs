@@ -12,6 +12,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+use failure;
 use rusoto_ce::CostExplorer;
 use rusoto_cloudwatch::CloudWatch;
 
@@ -26,8 +27,8 @@ struct Event {
     metric_name: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = env_logger::try_init();
+fn main() -> Result<(), failure::Error> {
+    env_logger::try_init()?;
     lambda!(handler);
     Ok(())
 }
@@ -53,11 +54,7 @@ fn push_dimension(event_element: &Option<String>, dimensions: &mut Vec<rusoto_cl
     }
 }
 
-fn fetch_utilization_percentage(
-    filter: &rusoto_ce::Expression,
-    event: &Event,
-    ctx: &lambda::Context,
-) -> Result<Option<f64>, lambda::error::HandlerError> {
+fn fetch_utilization_percentage(filter: &rusoto_ce::Expression, event: &Event) -> Result<Option<f64>, failure::Error> {
     // CostExplorer API is available in only us-east-1 (https://ce.us-east-1.amazonaws.com/)
     let cost_explorer = rusoto_ce::CostExplorerClient::new(rusoto_core::Region::UsEast1);
     let today: chrono::Date<chrono::Utc> = chrono::Utc::today();
@@ -94,15 +91,11 @@ fn fetch_utilization_percentage(
                 Ok(None)
             }
         }
-        Err(e) => Err(ctx.new_error(&format!("{:?}", e))),
+        Err(e) => Err(failure::format_err!("{:?}", e)),
     }
 }
 
-fn fetch_coverage_percentage(
-    filter: &rusoto_ce::Expression,
-    event: &Event,
-    ctx: &lambda::Context,
-) -> Result<Option<f64>, lambda::error::HandlerError> {
+fn fetch_coverage_percentage(filter: &rusoto_ce::Expression, event: &Event) -> Result<Option<f64>, failure::Error> {
     // CostExplorer API is available in only us-east-1 (https://ce.us-east-1.amazonaws.com/)
     let cost_explorer = rusoto_ce::CostExplorerClient::new(rusoto_core::Region::UsEast1);
     let today: chrono::Date<chrono::Utc> = chrono::Utc::today();
@@ -142,11 +135,11 @@ fn fetch_coverage_percentage(
                 Ok(None)
             }
         }
-        Err(e) => Err(ctx.new_error(&format!("{:?}", e))),
+        Err(e) => Err(failure::format_err!("{:?}", e)),
     }
 }
 
-fn fetch_percentage(event: &Event, ctx: &lambda::Context) -> Result<Option<f64>, lambda::error::HandlerError> {
+fn fetch_percentage(event: &Event) -> Result<Option<f64>, failure::Error> {
     let mut filter = rusoto_ce::Expression {
         and: Some(vec![]),
         ..Default::default()
@@ -157,20 +150,13 @@ fn fetch_percentage(event: &Event, ctx: &lambda::Context) -> Result<Option<f64>,
     let ce_metric_utilization = "utilization".to_string();
     let ce_metrice_type = event.ce_metric_type.as_ref().unwrap_or(&ce_metric_utilization).as_str();
     match ce_metrice_type {
-        "utilization" => fetch_utilization_percentage(&filter, &event, ctx),
-        "coverage" => fetch_coverage_percentage(&filter, &event, ctx),
-        _ => return Err(ctx.new_error(&format!("Unsupported Cost Explorer metrics type: {}", ce_metrice_type))),
+        "utilization" => fetch_utilization_percentage(&filter, &event),
+        "coverage" => fetch_coverage_percentage(&filter, &event),
+        _ => return Err(failure::format_err!("Unsupported Cost Explorer metrics type: {}", ce_metrice_type)),
     }
 }
 
-fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::HandlerError> {
-    let percentage = fetch_percentage(&event, &ctx)?;
-    if percentage.is_none() {
-        let message = "There are no metrics".to_string();
-        info!("{}", message);
-        return Ok(message);
-    }
-
+fn put_metric_data(percentage: f64, event: Event) -> Result<String, failure::Error> {
     let cloudwatch = rusoto_cloudwatch::CloudWatchClient::new(rusoto_core::Region::default());
     let mut dimensions = vec![];
     push_dimension(&event.region, &mut dimensions, "Region".to_string());
@@ -178,7 +164,7 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
     push_dimension(&event.linked_account, &mut dimensions, "LinkedAccount".to_string());
     let metric_data = vec![rusoto_cloudwatch::MetricDatum {
         metric_name: event.metric_name,
-        value: Some(percentage.unwrap()),
+        value: Some(percentage),
         dimensions: Some(dimensions),
         ..Default::default()
     }];
@@ -192,6 +178,17 @@ fn handler(event: Event, ctx: lambda::Context) -> Result<String, lambda::error::
 
     match cloudwatch.put_metric_data(cw_metric_input).sync() {
         Ok(r) => return Ok(format!("{:?}", r)),
-        Err(e) => return Err(ctx.new_error(&format!("{:?}", e))),
+        Err(e) => return Err(failure::format_err!("{:?}", e)),
     }
+}
+
+fn handler(event: Event, _: lambda::Context) -> Result<(), lambda::error::HandlerError> {
+    let percentage = fetch_percentage(&event)?;
+    if percentage.is_none() {
+        let message = "There are no metrics".to_string();
+        info!("{}", message);
+        return Ok(());
+    }
+    put_metric_data(percentage.unwrap(), event)?;
+    Ok(())
 }
