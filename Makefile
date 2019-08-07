@@ -8,7 +8,7 @@ init:
 build:
 	docker run --rm -v ${PWD}:/workspace:cached -v ${PWD}/tmp/cargo-registry:/usr/local/cargo/registry:cached ${BUILD_IMAGE} tools/build.sh
 
-release_build:
+release-build:
 	docker run --rm -v ${PWD}:/workspace:cached -v ${PWD}/tmp/cargo-registry:/usr/local/cargo/registry:cached -e RELEASE=1 ${BUILD_IMAGE} tools/build.sh
 
 run:
