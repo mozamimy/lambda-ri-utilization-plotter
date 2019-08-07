@@ -1,20 +1,6 @@
-extern crate chrono;
-extern crate env_logger;
-#[macro_use]
-extern crate lambda_runtime as lambda;
-#[macro_use]
-extern crate log;
-extern crate rusoto_ce;
-extern crate rusoto_cloudwatch;
-extern crate rusoto_core;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-
-use failure;
 use rusoto_ce::CostExplorer;
 use rusoto_cloudwatch::CloudWatch;
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Event {
@@ -29,7 +15,7 @@ struct Event {
 
 fn main() -> Result<(), failure::Error> {
     env_logger::try_init()?;
-    lambda!(handler);
+    lambda_runtime::lambda!(handler);
     Ok(())
 }
 
@@ -68,8 +54,8 @@ fn fetch_utilization_percentage(filter: &rusoto_ce::Expression, event: &Event) -
         ..Default::default()
     };
 
-    info!("Make a request for Cost Explorer");
-    info!("{:?}", ce_request);
+    log::info!("Make a request for Cost Explorer");
+    log::info!("{:?}", ce_request);
 
     match cost_explorer.get_reservation_utilization(ce_request).sync() {
         Ok(r) => {
@@ -109,8 +95,8 @@ fn fetch_coverage_percentage(filter: &rusoto_ce::Expression, event: &Event) -> R
         ..Default::default()
     };
 
-    info!("Make a request for Cost Explorer");
-    info!("{:?}", ce_request);
+    log::info!("Make a request for Cost Explorer");
+    log::info!("{:?}", ce_request);
 
     match cost_explorer.get_reservation_coverage(ce_request).sync() {
         Ok(r) => {
@@ -173,8 +159,8 @@ fn put_metric_data(percentage: f64, event: Event) -> Result<String, failure::Err
         metric_data: metric_data,
     };
 
-    info!("Make a request for CloudWatch Metrics");
-    info!("{:?}", cw_metric_input);
+    log::info!("Make a request for CloudWatch Metrics");
+    log::info!("{:?}", cw_metric_input);
 
     match cloudwatch.put_metric_data(cw_metric_input).sync() {
         Ok(r) => return Ok(format!("{:?}", r)),
@@ -182,11 +168,11 @@ fn put_metric_data(percentage: f64, event: Event) -> Result<String, failure::Err
     }
 }
 
-fn handler(event: Event, _: lambda::Context) -> Result<(), lambda::error::HandlerError> {
+fn handler(event: Event, _: lambda_runtime::Context) -> Result<(), lambda_runtime::error::HandlerError> {
     let percentage = fetch_percentage(&event)?;
     if percentage.is_none() {
         let message = "There are no metrics".to_string();
-        info!("{}", message);
+        log::info!("{}", message);
         return Ok(());
     }
     put_metric_data(percentage.unwrap(), event)?;
