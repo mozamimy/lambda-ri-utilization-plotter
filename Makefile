@@ -14,5 +14,3 @@ release_build:
 run:
 	sam local invoke -e event.json -t template.yml ${LOGICAL_FUNCTION_NAME}
 
-clean:
-	rm -rf target/debug target/release package/${APP_NAME}.zip
