@@ -4,19 +4,19 @@ This AWS Lambda fucntion puts datapoinsts fetched by Cost Explorer API to CloudW
 
 ## Build and Debug with SAM CLI
 
+Copy event.example.json to evnet.json and template.example.yml to template.yml and edit them for your development environment before follow bellow instructions.
+
 ```sh
-make build-docker-image # You need this command at first time building
+make init # You need this command at first time building
 make build
-make zip
 make run
 ```
 
 ## Build for Releasing
 
 ```sh
-make build-docker-image # You need this command at first time building
-make build BUILD=release
-make zip BUILD=release
+make init # You need this command at first time building
+make release_build
 ```
 
 ## Customize

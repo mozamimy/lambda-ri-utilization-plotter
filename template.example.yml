@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: 'A serverless application to plot RI Utilization data point to a custom CloudWatch Metrics.'
+Resources:
+  RIUtilizationPlotter:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: './target/debug/bootstrap.zip'
+      FunctionName: 'ri-utilization-plotter'
+      Handler: 'ri-utilization-plotter'
+      MemorySize: 128
+      Runtime: 'provided'
+      Timeout: 30
+      Environment:
+        Variables:
+          RUST_LOG: 'info'
+          RUST_BACKTRACE: '1'
